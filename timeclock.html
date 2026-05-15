@@ -360,7 +360,8 @@
   function pingSheet(action, date, time) {
     if (SCRIPT_URL === "YOUR_APPS_SCRIPT_URL_HERE") return;
     const url = `${SCRIPT_URL}?action=${action}&user=${encodeURIComponent(user)}&date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}`;
-    fetch(url, { mode: "no-cors" }).catch(() => {});
+    const img = new Image();
+    img.src = url;
   }
 </script>
 </body>
