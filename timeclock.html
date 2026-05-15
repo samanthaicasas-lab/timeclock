@@ -10,11 +10,745 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
+  *, *::before<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a0a">
+<title>Time Clock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
     --bg: #0a0a0a;
     --surface: #141414;
+    --border: #222;
+    --text: #f0f0f0;
+    --muted: #666;
+    --accent: #e8f5a3;
+    --accent-dim: rgba(232,245,163,0.12);
+    --accent-text: #0a0a0a;
+    --in-bg: rgba(232,245,163,0.08);
+    --in-border: rgba(232,245,163,0.3);
+    --radius: 16px;
+    --font-mono: 'DM Mono', monospace;
+    --font-sans: 'DM Sans', sans-serif;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100dvh;
+    padding: 24px 20px;
+    gap: 0;
+  }
+
+  .grain {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.5;
+  }
+
+  .app { position: relative; z-index: 1; width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 20px; }
+
+  .header { text-align: center; }
+  .greeting { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 400; margin-bottom: 4px; }
+  .username { font-size: 22px; font-weight: 500; color: var(--text); letter-spacing: -0.02em; }
+
+  .clock-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .time-display {
+    text-align: center;
+  }
+  .current-time {
+    font-family: var(--font-mono);
+    font-size: 42px;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    line-height: 1;
+  }
+  .current-date {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 6px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    transition: all 0.3s ease;
+  }
+  .status-badge.active {
+    background: var(--in-bg);
+    border-color: var(--in-border);
+    color: var(--accent);
+  }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.3s;
+  }
+  .status-badge.active .status-dot {
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+  .elapsed {
+    font-family: var(--font-mono);
+    font-size: 28px;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+    display: none;
+  }
+  .elapsed.visible { display: block; }
+
+  .punch-btn {
+    width: 100%;
+    padding: 20px;
+    font-family: var(--font-sans);
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  .punch-btn:active { transform: scale(0.97); }
+  .punch-btn.clocked-in {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-text);
+  }
+  .punch-btn:not(.clocked-in):hover { background: #1c1c1c; border-color: #333; }
+
+  .log-section { width: 100%; }
+  .log-label {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+    padding: 0 2px;
+  }
+  .log-list { display: flex; flex-direction: column; gap: 6px; }
+
+  .log-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px;
+    font-size: 12px;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn { from { opacity:0; transform: translateY(4px); } to { opacity:1; transform:none; } }
+  .log-item .lbl { color: var(--muted); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 2px; }
+  .log-item .val { font-family: var(--font-mono); font-size: 13px; color: var(--text); }
+  .log-item .val.pending { color: var(--accent); }
+  .log-item .elapsed-val { font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+
+  .empty-log {
+    text-align: center;
+    padding: 20px;
+    font-size: 13px;
+    color: var(--muted);
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+  }
+
+  .setup-banner {
+    background: #1a1008;
+    border: 1px solid #3d2800;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 12px;
+    color: #c8a060;
+    line-height: 1.6;
+    display: none;
+  }
+  .setup-banner.show { display: block; }
+  .setup-banner strong { color: #e8c080; }
+
+  .no-user {
+    text-align: center;
+    padding: 40px 20px;
+  }
+  .no-user h1 { font-size: 18px; font-weight: 500; margin-bottom: 8px; }
+  .no-user p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .no-user code { font-family: var(--font-mono); background: var(--surface); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+
+<div class="app" id="app">
+  <div id="no-user-msg" class="no-user" style="display:none;">
+    <h1>No user set</h1>
+    <p>Open this app with a <code>?user=Name</code> parameter.<br>e.g. <code>timeclock.html?user=Sarah</code></p>
+  </div>
+
+  <div id="main" style="display:none; width:100%; display:flex; flex-direction:column; gap:20px;">
+    <div class="header">
+      <div class="greeting">Welcome back</div>
+      <div class="username" id="username-display"></div>
+    </div>
+
+    <div class="clock-card">
+      <div class="time-display">
+        <div class="current-time" id="live-time">--:--:--</div>
+        <div class="current-date" id="live-date"></div>
+      </div>
+      <div class="status-badge" id="status-badge">
+        <span class="status-dot"></span>
+        <span id="status-text">Not clocked in</span>
+      </div>
+      <div class="elapsed" id="elapsed-display"></div>
+    </div>
+
+    <div id="setup-banner" class="setup-banner">
+      <strong>⚠ Sheet URL not configured.</strong> Punches are saved locally only. Ask your admin to add the Apps Script URL to this app.
+    </div>
+
+    <button class="punch-btn" id="punch-btn" onclick="punch()">Clock In</button>
+
+    <div class="log-section">
+      <div class="log-label">Today's log</div>
+      <div class="log-list" id="log-list">
+        <div class="empty-log">No punches yet today.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── CONFIG ── paste your Apps Script deployment URL here ──────────────────
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxdSvhAxGPsK4mJKKp684nv4Uz8AYJ0sOlHqesMBF39sLXh-hKBL2rlW33tJ9WEn3Z4EQ/exec";
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const params = new URLSearchParams(window.location.search);
+  const user = params.get("user") || params.get("name") || "";
+
+  let clockedIn = false;
+  let startTime = null;
+  let elapsedInterval = null;
+  let entries = [];
+
+  if (!user) {
+    document.getElementById("no-user-msg").style.display = "block";
+    document.getElementById("main").style.display = "none";
+  } else {
+    document.getElementById("no-user-msg").style.display = "none";
+    document.getElementById("main").style.display = "flex";
+    document.getElementById("username-display").textContent = decodeURIComponent(user);
+    if (SCRIPT_URL === "YOUR_APPS_SCRIPT_URL_HERE") {
+      document.getElementById("setup-banner").classList.add("show");
+    }
+    init();
+  }
+
+  function init() {
+    updateClock();
+    setInterval(updateClock, 1000);
+  }
+
+  function updateClock() {
+    const now = new Date();
+    document.getElementById("live-time").textContent =
+      now.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+    document.getElementById("live-date").textContent =
+      now.toLocaleDateString([], {weekday:"long", month:"long", day:"numeric"});
+    if (clockedIn) updateElapsed();
+  }
+
+  function updateElapsed() {
+    const ms = Date.now() - startTime;
+    const s = Math.floor(ms/1000), m = Math.floor(s/60), h = Math.floor(m/60);
+    const pad = n => String(n).padStart(2,"0");
+    document.getElementById("elapsed-display").textContent =
+      `${pad(h)}:${pad(m%60)}:${pad(s%60)}`;
+  }
+
+  function punch() {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+    const dateStr = now.toLocaleDateString([], {year:"numeric", month:"2-digit", day:"2-digit"});
+
+    if (!clockedIn) {
+      clockedIn = true;
+      startTime = now.getTime();
+      entries.push({ date: dateStr, start: timeStr, end: null });
+      document.getElementById("punch-btn").textContent = "Clock Out";
+      document.getElementById("punch-btn").classList.add("clocked-in");
+      document.getElementById("status-badge").classList.add("active");
+      document.getElementById("status-text").textContent = "Clocked in";
+      document.getElementById("elapsed-display").classList.add("visible");
+      pingSheet("start", dateStr, timeStr);
+    } else {
+      clockedIn = false;
+      const ms = now.getTime() - startTime;
+      entries[entries.length-1].end = timeStr;
+      entries[entries.length-1].elapsed = ms;
+      document.getElementById("punch-btn").textContent = "Clock In";
+      document.getElementById("punch-btn").classList.remove("clocked-in");
+      document.getElementById("status-badge").classList.remove("active");
+      document.getElementById("status-text").textContent = "Not clocked in";
+      document.getElementById("elapsed-display").classList.remove("visible");
+      pingSheet("end", dateStr, timeStr);
+    }
+    renderLog();
+  }
+
+  function renderLog() {
+    const list = document.getElementById("log-list");
+    if (!entries.length) {
+      list.innerHTML = '<div class="empty-log">No punches yet today.</div>';
+      return;
+    }
+    list.innerHTML = entries.slice().reverse().map(e => {
+      const dur = e.elapsed ? fmtElapsed(e.elapsed) : "—";
+      const endVal = e.end
+        ? `<div class="lbl">End</div><div class="val">${e.end}</div>`
+        : `<div class="lbl">End</div><div class="val pending">In progress</div>`;
+      return `<div class="log-item">
+        <div><div class="lbl">Start</div><div class="val">${e.start}</div></div>
+        <div>${endVal}</div>
+        <div><div class="lbl">Duration</div><div class="elapsed-val">${dur}</div></div>
+      </div>`;
+    }).join("");
+  }
+
+  function fmtElapsed(ms) {
+    const s = Math.floor(ms/1000), m = Math.floor(s/60), h = Math.floor(m/60);
+    return (h ? h+"h " : "") + (m%60 ? (m%60)+"m " : "") + (s%60)+"s";
+  }
+
+  function pingSheet(action, date, time) {
+    if (SCRIPT_URL === "YOUR_APPS_SCRIPT_URL_HERE") return;
+    const url = `${SCRIPT_URL}?action=${action}&user=${encodeURIComponent(user)}&date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}`;
+    fetch(url, { mode: "no-cors" }).catch(() => {});
+  }
+</script>
+</body>
+</html>
+, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a0a">
+<title>Time Clock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --border: #222;
+    --text: #f0f0f0;
+    --muted: #666;
+    --accent: #e8f5a3;
+    --accent-dim: rgba(232,245,163,0.12);
+    --accent-text: #0a0a0a;
+    --in-bg: rgba(232,245,163,0.08);
+    --in-border: rgba(232,245,163,0.3);
+    --radius: 16px;
+    --font-mono: 'DM Mono', monospace;
+    --font-sans: 'DM Sans', sans-serif;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100dvh;
+    padding: 24px 20px;
+    gap: 0;
+  }
+
+  .grain {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.5;
+  }
+
+  .app { position: relative; z-index: 1; width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 20px; }
+
+  .header { text-align: center; }
+  .greeting { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 400; margin-bottom: 4px; }
+  .username { font-size: 22px; font-weight: 500; color: var(--text); letter-spacing: -0.02em; }
+
+  .clock-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .time-display {
+    text-align: center;
+  }
+  .current-time {
+    font-family: var(--font-mono);
+    font-size: 42px;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    line-height: 1;
+  }
+  .current-date {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 6px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    transition: all 0.3s ease;
+  }
+  .status-badge.active {
+    background: var(--in-bg);
+    border-color: var(--in-border);
+    color: var(--accent);
+  }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.3s;
+  }
+  .status-badge.active .status-dot {
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+  .elapsed {
+    font-family: var(--font-mono);
+    font-size: 28px;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+    display: none;
+  }
+  .elapsed.visible { display: block; }
+
+  .punch-btn {
+    width: 100%;
+    padding: 20px;
+    font-family: var(--font-sans);
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  .punch-btn:active { transform: scale(0.97); }
+  .punch-btn.clocked-in {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-text);
+  }
+  .punch-btn:not(.clocked-in):hover { background: #1c1c1c; border-color: #333; }
+
+  .log-section { width: 100%; }
+  .log-label {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+    padding: 0 2px;
+  }
+  .log-list { display: flex; flex-direction: column; gap: 6px; }
+
+  .log-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px;
+    font-size: 12px;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn { from { opacity:0; transform: translateY(4px); } to { opacity:1; transform:none; } }
+  .log-item .lbl { color: var(--muted); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 2px; }
+  .log-item .val { font-family: var(--font-mono); font-size: 13px; color: var(--text); }
+  .log-item .val.pending { color: var(--accent); }
+  .log-item .elapsed-val { font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+
+  .empty-log {
+    text-align: center;
+    padding: 20px;
+    font-size: 13px;
+    color: var(--muted);
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+  }
+
+  .setup-banner {
+    background: #1a1008;
+    border: 1px solid #3d2800;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 12px;
+    color: #c8a060;
+    line-height: 1.6;
+    display: none;
+  }
+  .setup-banner.show { display: block; }
+  .setup-banner strong { color: #e8c080; }
+
+  .no-user {
+    text-align: center;
+    padding: 40px 20px;
+  }
+  .no-user h1 { font-size: 18px; font-weight: 500; margin-bottom: 8px; }
+  .no-user p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .no-user code { font-family: var(--font-mono); background: var(--surface); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+
+<div class="app" id="app">
+  <div id="no-user-msg" class="no-user" style="display:none;">
+    <h1>No user set</h1>
+    <p>Open this app with a <code>?user=Name</code> parameter.<br>e.g. <code>timeclock.html?user=Sarah</code></p>
+  </div>
+
+  <div id="main" style="display:none; width:100%; display:flex; flex-direction:column; gap:20px;">
+    <div class="header">
+      <div class="greeting">Welcome back</div>
+      <div class="username" id="username-display"></div>
+    </div>
+
+    <div class="clock-card">
+      <div class="time-display">
+        <div class="current-time" id="live-time">--:--:--</div>
+        <div class="current-date" id="live-date"></div>
+      </div>
+      <div class="status-badge" id="status-badge">
+        <span class="status-dot"></span>
+        <span id="status-text">Not clocked in</span>
+      </div>
+      <div class="elapsed" id="elapsed-display"></div>
+    </div>
+
+    <div id="setup-banner" class="setup-banner">
+      <strong>⚠ Sheet URL not configured.</strong> Punches are saved locally only. Ask your admin to add the Apps Script URL to this app.
+    </div>
+
+    <button class="punch-btn" id="punch-btn" onclick="punch()">Clock In</button>
+
+    <div class="log-section">
+      <div class="log-label">Today's log</div>
+      <div class="log-list" id="log-list">
+        <div class="empty-log">No punches yet today.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── CONFIG ── paste your Apps Script deployment URL here ──────────────────
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxdSvhAxGPsK4mJKKp684nv4Uz8AYJ0sOlHqesMBF39sLXh-hKBL2rlW33tJ9WEn3Z4EQ/exec";
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const params = new URLSearchParams(window.location.search);
+  const user = params.get("user") || params.get("name") || "";
+
+  let clockedIn = false;
+  let startTime = null;
+  let elapsedInterval = null;
+  let entries = [];
+
+  if (!user) {
+    document.getElementById("no-user-msg").style.display = "block";
+    document.getElementById("main").style.display = "none";
+  } else {
+    document.getElementById("no-user-msg").style.display = "none";
+    document.getElementById("main").style.display = "flex";
+    document.getElementById("username-display").textContent = decodeURIComponent(user);
+    if (SCRIPT_URL === "YOUR_APPS_SCRIPT_URL_HERE") {
+      document.getElementById("setup-banner").classList.add("show");
+    }
+    init();
+  }
+
+  function init() {
+    updateClock();
+    setInterval(updateClock, 1000);
+  }
+
+  function updateClock() {
+    const now = new Date();
+    document.getElementById("live-time").textContent =
+      now.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+    document.getElementById("live-date").textContent =
+      now.toLocaleDateString([], {weekday:"long", month:"long", day:"numeric"});
+    if (clockedIn) updateElapsed();
+  }
+
+  function updateElapsed() {
+    const ms = Date.now() - startTime;
+    const s = Math.floor(ms/1000), m = Math.floor(s/60), h = Math.floor(m/60);
+    const pad = n => String(n).padStart(2,"0");
+    document.getElementById("elapsed-display").textContent =
+      `${pad(h)}:${pad(m%60)}:${pad(s%60)}`;
+  }
+
+  function punch() {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+    const dateStr = now.toLocaleDateString([], {year:"numeric", month:"2-digit", day:"2-digit"});
+
+    if (!clockedIn) {
+      clockedIn = true;
+      startTime = now.getTime();
+      entries.push({ date: dateStr, start: timeStr, end: null });
+      document.getElementById("punch-btn").textContent = "Clock Out";
+      document.getElementById("punch-btn").classList.add("clocked-in");
+      document.getElementById("status-badge").classList.add("active");
+      document.getElementById("status-text").textContent = "Clocked in";
+      document.getElementById("elapsed-display").classList.add("visible");
+      pingSheet("start", dateStr, timeStr);
+    } else {
+      clockedIn = false;
+      const ms = now.getTime() - startTime;
+      entries[entries.length-1].end = timeStr;
+      entries[entries.length-1].elapsed = ms;
+      document.getElementById("punch-btn").textContent = "Clock In";
+      document.getElementById("punch-btn").classList.remove("clocked-in");
+      document.getElementById("status-badge").classList.remove("active");
+      document.getElementById("status-text").textContent = "Not clocked in";
+      document.getElementById("elapsed-display").classList.remove("visible");
+      pingSheet("end", dateStr, timeStr);
+    }
+    renderLog();
+  }
+
+  function renderLog() {
+    const list = document.getElementById("log-list");
+    if (!entries.length) {
+      list.innerHTML = '<div class="empty-log">No punches yet today.</div>';
+      return;
+    }
+    list.innerHTML = entries.slice().reverse().map(e => {
+      const dur = e.elapsed ? fmtElapsed(e.elapsed) : "—";
+      const endVal = e.end
+        ? `<div class="lbl">End</div><div class="val">${e.end}</div>`
+        : `<div class="lbl">End</div><div class="val pending">In progress</div>`;
+      return `<div class="log-item">
+        <div><div class="lbl">Start</div><div class="val">${e.start}</div></div>
+        <div>${endVal}</div>
+        <div><div class="lbl">Duration</div><div class="elapsed-val">${dur}</div></div>
+      </div>`;
+    }).join("");
+  }
+
+  function fmtElapsed(ms) {
+    const s = Math.floor(ms/1000), m = Math.floor(s/60), h = Math.floor(m/60);
+    return (h ? h+"h " : "") + (m%60 ? (m%60)+"m " : "") + (s%60)+"s";
+  }
+
+  function pingSheet(action, date, time) {
+    if (SCRIPT_URL === "YOUR_APPS_SCRIPT_URL_HERE") return;
+    const url = `${SCRIPT_URL}?action=${action}&user=${encodeURIComponent(user)}&date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}`;
+    fetch(url, { mode: "no-cors" }).catch(() => {});
+  }
+</script>
+</body>
+</html>
+
     --border: #222;
     --text: #f0f0f0;
     --muted: #666;
